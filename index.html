@@ -129,6 +129,12 @@
         color: white;
     }
     
+    .btn-emergency {
+        background: linear-gradient(45deg, #e74c3c, #c0392b);
+        color: white;
+        animation: pulse 2s infinite;
+    }
+    
     .btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 10px 20px rgba(0,0,0,0.2);
@@ -197,6 +203,12 @@
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+        70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
     }
     
     .preview-image {
@@ -326,6 +338,72 @@
         flex: 1;
         padding: 10px;
     }
+    
+    /* NEW: Quick actions section */
+    .quick-actions {
+        background: rgba(255,255,255,0.1);
+        border-radius: 20px;
+        padding: 20px;
+        margin-bottom: 20px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .quick-actions-title {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    /* NEW: History section */
+    .history-section {
+        background: rgba(255,255,255,0.1);
+        border-radius: 20px;
+        padding: 20px;
+        margin-top: 20px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+        display: none;
+    }
+    
+    .history-item {
+        background: rgba(255,255,255,0.1);
+        padding: 12px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        font-size: 0.9em;
+    }
+    
+    .history-time {
+        font-size: 0.8em;
+        opacity: 0.7;
+        margin-top: 5px;
+    }
+    
+    /* NEW: Emergency contact chips */
+    .emergency-contacts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .contact-chip {
+        background: rgba(231, 76, 60, 0.3);
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 0.9em;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .contact-chip:hover {
+        background: rgba(231, 76, 60, 0.5);
+        transform: translateY(-2px);
+    }
     </style>
 </head>
 <body>
@@ -333,6 +411,20 @@
         <div class="header">
             <div class="title">🛡️ Anti-Bullying AI</div>
             <div class="subtitle">Keep schools safe with AI technology</div>
+        </div>
+        
+        <!-- NEW: Quick Actions Section -->
+        <div class="quick-actions">
+            <div class="quick-actions-title">
+                <span>⚡</span>
+                <span>Quick Actions</span>
+            </div>
+            <button class="btn btn-emergency" onclick="triggerEmergencyAlert()">
+                🚨 Emergency Alert
+            </button>
+            <button class="btn btn-alert" onclick="showHistory()">
+                📋 View History
+            </button>
         </div>
         
         <div class="camera-section">
@@ -379,7 +471,34 @@
                         🔕 Stop Sound
                     </button>
                 </div>
+                
+                <!-- NEW: Emergency contacts -->
+                <div style="margin-top: 15px;">
+                    <div style="font-weight: bold; margin-bottom: 10px;">📞 Emergency Contacts:</div>
+                    <div class="emergency-contacts">
+                        <div class="contact-chip" onclick="contactSecurity()">Security</div>
+                        <div class="contact-chip" onclick="contactCounselor()">Counselor</div>
+                        <div class="contact-chip" onclick="contactPrincipal()">Principal</div>
+                    </div>
+                </div>
             </div>
+        </div>
+        
+        <!-- NEW: History Section -->
+        <div class="history-section" id="history-section">
+            <div class="results-title">
+                <span>📋</span>
+                <span>Scan History</span>
+            </div>
+            <div id="history-content">
+                <div class="history-item">
+                    <div>No scans recorded yet</div>
+                    <div class="history-time">Start scanning to see history</div>
+                </div>
+            </div>
+            <button class="btn" onclick="hideHistory()" style="background: rgba(255,255,255,0.2);">
+                ← Back to Scanner
+            </button>
         </div>
     </div>
 
@@ -428,10 +547,15 @@
         const uploadArea = document.getElementById('upload-area');
         const reportSection = document.getElementById('report-section');
         const reportModal = document.getElementById('reportModal');
+        const historySection = document.getElementById('history-section');
+        const historyContent = document.getElementById('history-content');
         
         // Alert sound variables
         let alertSound = null;
         let alertInterval = null;
+        
+        // Scan history
+        let scanHistory = [];
         
         // School contact information (would be configured by school admin)
         const SCHOOL_CONTACTS = {
@@ -536,6 +660,7 @@
             loading.style.display = 'block';
             results.style.display = 'none';
             reportSection.style.display = 'none';
+            historySection.style.display = 'none';
             
             try {
                 // Create FormData for multipart upload
@@ -560,6 +685,10 @@
                 }
                 
                 const result = await response.json();
+                
+                // Add to history
+                addToHistory(result);
+                
                 displayResults(result);
                 
             } catch (error) {
@@ -677,6 +806,101 @@
                     </div>
                 </div>
             `;
+        }
+        
+        // NEW: Add to history function
+        function addToHistory(result) {
+            const historyItem = {
+                timestamp: new Date(),
+                hasDetection: result.predictions && result.predictions.length > 0,
+                detectionCount: result.predictions ? result.predictions.length : 0,
+                predictions: result.predictions || []
+            };
+            
+            scanHistory.unshift(historyItem);
+            
+            // Keep only last 10 scans
+            if (scanHistory.length > 10) {
+                scanHistory.pop();
+            }
+            
+            updateHistoryDisplay();
+        }
+        
+        // NEW: Update history display
+        function updateHistoryDisplay() {
+            if (scanHistory.length === 0) {
+                historyContent.innerHTML = `
+                    <div class="history-item">
+                        <div>No scans recorded yet</div>
+                        <div class="history-time">Start scanning to see history</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            historyContent.innerHTML = '';
+            
+            scanHistory.forEach((item, index) => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                
+                if (item.hasDetection) {
+                    historyItem.innerHTML = `
+                        <div style="color: #e74c3c; font-weight: bold;">🚨 ${item.detectionCount} bullying incident(s) detected</div>
+                        <div class="history-time">${item.timestamp.toLocaleString()}</div>
+                    `;
+                    historyItem.style.borderLeft = '4px solid #e74c3c';
+                } else {
+                    historyItem.innerHTML = `
+                        <div style="color: #2ecc71; font-weight: bold;">✅ No bullying detected</div>
+                        <div class="history-time">${item.timestamp.toLocaleString()}</div>
+                    `;
+                    historyItem.style.borderLeft = '4px solid #2ecc71';
+                }
+                
+                historyContent.appendChild(historyItem);
+            });
+        }
+        
+        // NEW: Show history
+        function showHistory() {
+            results.style.display = 'none';
+            historySection.style.display = 'block';
+            updateHistoryDisplay();
+        }
+        
+        // NEW: Hide history
+        function hideHistory() {
+            historySection.style.display = 'none';
+            results.style.display = 'block';
+        }
+        
+        // NEW: Emergency alert function
+        function triggerEmergencyAlert() {
+            if (confirm("🚨 EMERGENCY ALERT!\n\nThis will immediately notify school authorities of an emergency situation. Are you sure you want to proceed?")) {
+                playAlertSound();
+                
+                // Send emergency SMS
+                const emergencyMessage = `🚨 EMERGENCY ALERT: User has triggered an emergency alert. Immediate assistance required. Location: School premises. Time: ${new Date().toLocaleString()}`;
+                const smsUrl = `sms:${SCHOOL_CONTACTS.sms}?body=${encodeURIComponent(emergencyMessage)}`;
+                window.location.href = smsUrl;
+                
+                alert("Emergency alert activated! Authorities have been notified.");
+            }
+        }
+        
+        // NEW: Emergency contact functions
+        function contactSecurity() {
+            alert("Contacting school security...\n\nThis would connect to security in a real implementation.");
+        }
+        
+        function contactCounselor() {
+            alert("Contacting school counselor...\n\nThis would connect to a counselor in a real implementation.");
+        }
+        
+        function contactPrincipal() {
+            alert("Contacting principal...\n\nThis would connect to the principal in a real implementation.");
         }
         
         // Reporting Functions
