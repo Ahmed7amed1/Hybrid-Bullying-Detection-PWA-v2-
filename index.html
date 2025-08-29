@@ -918,10 +918,22 @@
         }
         
         
-function reportViaSMS() {
+
+function reportViaSMS(anonymous=false) {
     getUserLocation(location => {
-        const message = `🚨 BULLYING ALERT: Potential bullying incident detected.
+        const header = anonymous 
+            ? "🚨 Anonymous Bullying Report" 
+            : "🚨 BULLYING ALERT: Incident detected";
+        const message = `${header}
 Time: ${new Date().toLocaleString()}
+Location: ${location}`;
+        const recipients = buildRecipients();
+        const smsUrl = `sms:${recipients}?body=${encodeURIComponent(message)}`;
+        window.location.href = smsUrl;
+        closeReportModal();
+    });
+}
+
 Location: ${location}`;
         const smsUrl = `sms:${SCHOOL_CONTACTS.sms}?body=${encodeURIComponent(message)}`;
         window.location.href = smsUrl;
@@ -931,12 +943,11 @@ Location: ${location}`;
 
         
         
+
 function reportViaEmail() {
     getUserLocation(location => {
         const subject = "🚨 Bullying Incident Report";
         const body = `Bullying Detection System Alert:
-
-A potential bullying incident was detected.
 
 Time: ${new Date().toLocaleString()}
 Location: ${location}
@@ -951,18 +962,24 @@ Sent via BullyGuard App`;
     });
 }
 
+Location: ${location}
+
+Please investigate this matter immediately.
+
+--
+Sent via BullyGuard App`;
+        const mailUrl = `mailto:${SCHOOL_CONTACTS.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailUrl;
+        closeReportModal();
+    });
+}
+
         
-        function makeAnonymousReport() {
-            // In a real implementation, this would connect to a secure backend
-            alert(`Anonymous report submitted successfully.\n\nSchool authorities have been notified without revealing your identity.\n\nThank you for helping keep your school safe!`);
-            
-            // Simulate reporting process
-            setTimeout(() => {
-                alert('✓ Report received anonymously\n✓ Authorities notified\n✓ No identifying information collected');
-            }, 1000);
-            
-            closeReportModal();
-        }
+        
+function makeAnonymousReport() {
+    reportViaSMS(true);
+}
+
         
         // Alert Sound Functions
         function playAlertSound() {
@@ -1026,14 +1043,19 @@ Sent via BullyGuard App`;
         
         
 // Location helper
+
 function getUserLocation(callback) {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-            pos => callback(`Lat: ${pos.coords.latitude}, Lon: ${pos.coords.longitude}`),
+            pos => {
+                const mapsLink = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                callback(mapsLink);
+            },
             () => callback("Location not available")
         );
     } else callback("Geolocation not supported");
 }
+
 
 
 // Emergency contacts storage
@@ -1070,6 +1092,15 @@ function addContact() {
 }
 
 window.addEventListener("load", renderContacts);
+
+
+function buildRecipients() {
+    if (emergencyContacts.length > 0) {
+        return emergencyContacts.map(c => c.number).join(",");
+    }
+    return SCHOOL_CONTACTS.sms;
+}
+
 
 // PWA Installation
         window.addEventListener('beforeinstallprompt', (e) => {
